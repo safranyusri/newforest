@@ -1,3 +1,5 @@
+// create feature collections, water_training, forest_training, nonforest_training
+
 // Step 1. Create filters
 
 // Center the map on bangka.
@@ -5,8 +7,9 @@ var bound = aoi.bounds();
 Map.centerObject(bound, 8);
 
 //Construct start and end dates:
-var start = ee.Date('2017-01-01');
-var finish = ee.Date('2017-12-31');
+var year = 2017;
+var start = (year)+'-01-01';
+var finish = (year)+'-12-31';
 
 // Step 5. Load Sentinel 2 dataset
 // Function to mask clouds using the Sentinel-2 QA band.
