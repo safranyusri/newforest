@@ -62,105 +62,19 @@ var maskedComposite = composite.updateMask(maskland);
 // Display the masked composite
 //Map.addLayer(maskedComposite, covisparam, 'masked');
 
-// Step 5. Apply Lyzenga algorithm
-
-
-// Select bands for calculation
-var band2 = maskedComposite.select('B2');
-var band3 = maskedComposite.select('B3');
-var band23 = maskedComposite.select('B2', 'B3');
-
-// Calculate region statistics
-
-// Calculate band variance.
-var band2_mean = band2.reduceRegion({
-  reducer: ee.Reducer.mean(),
-  geometry: coral_training.geometry(),
-  scale: 10,
-  maxPixels: 1e8
-});
-
-var band2_var = band2.reduceRegion({
-  reducer: ee.Reducer.variance(),
-  geometry: coral_training.geometry(),
-  scale: 10,
-  maxPixels: 1e8
-});
-
-var band3_mean = band3.reduceRegion({
-  reducer: ee.Reducer.mean(),
-  geometry: coral_training.geometry(),
-  scale: 10,
-  maxPixels: 1e8
-});
-
-var band3_var = band3.reduceRegion({
-  reducer: ee.Reducer.variance(),
-  geometry: coral_training.geometry(),
-  scale: 10,
-  maxPixels: 1e8
-});
-
-// Calculate band covariance
-var arrays = band23.toArray();
-var covar = arrays.reduceRegion({
-  reducer: ee.Reducer.covariance(),
-  geometry: coral_training,
-  scale: 10,
-  maxPixels: 1e8
-  });
-
-var band23_covar = ee.Array(covar.get('array')).get([1, 0]);
-print('band23_covar',band23_covar);
-var b2 = ee.Array(covar.get('array')).get([0, 0]);
-var b3 = ee.Array(covar.get('array')).get([1, 1]);
-
-// Calculate a 
-
-var diffvar = ee.Number(b2.getInfo()-b3.getInfo());
-print('diffvar', diffvar);
-
-var a23 = diffvar.divide(band23_covar.multiply(2));
-print('a23',a23);
-
-// Calculate ki/kj
-
-var a23pow = a23.pow(2);
-print('a23pow',a23pow);
-var a23pow1 = a23pow.add(1);
-print('a23pow1',a23pow1);
-var a23pow1root = a23pow1.sqrt();
-print('a23pow1root',a23pow1root);
-var kikj = a23.add(a23pow1root)
-print('kikj',kikj);
-
-// calculate log of bands
-var logb2 = maskedComposite.select('B2').log();
-print('logb2',logb2);
-var logb3 = maskedComposite.select('B3').log();
-print('logb3',logb3);
-var kikjlogb3 = logb3.multiply(kikj);
-print('kikjlogb3',kikjlogb3);
-
-// create new lyzenga band
-var lyzenga = ee.Image(ee.Algorithms.If(maskedComposite.select('B4')
-  .gt(20), logb2.add(kikjlogb3),'')).rename('lyzenga');
-
-// display lyzenga
-//Map.addLayer(lyzenga, {},'Lyzenga'); 
 
 // stack layers
-var stacked = maskedComposite.select('B1','B2','B3','B4').addBands(lyzenga);
+var stacked = maskedComposite.select('B1','B2','B3','B4');//.addBands(lyzenga);
 
 // Step 7. Supervised classification
 
-var bands = ['B1','B2','B3','B4','lyzenga'];
+var bands = ['B1','B2','B3','B4'];
 
 // merge geometry of training data
-var habitat_water = coral_training.merge(sand_training).merge(deep_training);
+var habitat_water = forest_training.merge(nonforest_training).merge(water_training);
 print(habitat_water, 'habitat_water');
 
-var habitat = coral_training.merge(sand_training);
+var habitat = forest_training.merge(nonforest_training);
 print(habitat, 'habitat');
 
 // Sample the input imagery to get a FeatureCollection of training data.
@@ -170,8 +84,9 @@ var training = stacked.select(bands).sampleRegions({
   scale: 10  // should reflect the scale of your imagery
 });
 
+
 // Make a random forest classifier and train it.
-var rfclassifier = ee.Classifier.smileRandomForest().train({
+var rfclassifier = ee.Classifier.smileRandomForest(100).train({
   features: training,
   classProperty: 'habitat',
   inputProperties: bands
@@ -192,9 +107,9 @@ var classifiedsvm = stacked.select(bands).classify(svmclassifier);
 
 // Define a palette for the classification.
 var palette = [
-  '0800ff', // deep (0)
-  'd30000', // coral (1)
-  'fff200' //  sand (2)
+  '0800ff', // water (0)
+  'd30000', // forest (1)
+  'fff200' //  nonforest (2)
 ];
 
 // Display the classifiedrf 
